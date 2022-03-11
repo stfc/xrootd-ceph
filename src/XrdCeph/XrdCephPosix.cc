@@ -1008,6 +1008,8 @@ int ceph_posix_fstat(int fd, struct stat *buf) {
     if (rc != 0) {
       return -rc;
     }
+    buf->st_dev = 1;
+    buf->st_ino = 1;
     buf->st_mtime = buf->st_atime;
     buf->st_ctime = buf->st_atime;
     buf->st_mode = 0666 | S_IFREG;
@@ -1039,6 +1041,8 @@ int ceph_posix_stat(XrdOucEnv* env, const char *pathname, struct stat *buf) {
       return -rc;
     }
   }
+  buf->st_dev = 1;
+  buf->st_ino = 1;
   buf->st_mtime = buf->st_atime;
   buf->st_ctime = buf->st_atime;
   buf->st_mode = 0666 | S_IFREG;
