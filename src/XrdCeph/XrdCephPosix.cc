@@ -1041,6 +1041,8 @@ int ceph_posix_stat(XrdOucEnv* env, const char *pathname, struct stat *buf) {
       return -rc;
     }
   }
+ // XRootD assumes an 'offline' file if st_dev and st_ino 
+// are zero. Set to non-zero (meaningful) values to avoid this 
   buf->st_dev = 1;
   buf->st_ino = 1;
   buf->st_mtime = buf->st_atime;
