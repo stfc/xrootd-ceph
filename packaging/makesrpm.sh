@@ -82,6 +82,7 @@ while test ${#} -ne 0; do
     fi
     cp rhel/xrootd-ceph.spec.in rhel/${2}.spec.in
     sed -i "s/xrootd-ceph/${2}/" rhel/${2}.spec.in 
+    cp rhel/${2}.spec.in /root/rpmbuild/SPECS
     RPM_NAME="${2}"
     shift
   fi
