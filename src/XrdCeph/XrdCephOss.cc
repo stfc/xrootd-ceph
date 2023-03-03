@@ -315,8 +315,6 @@ int XrdCephOss::Configure(const char *configfn, XrdSysError &Eroute) {
          }
        }
 
-     } // while
-
        if (!strcmp(var, "ceph.reportingpools")) {
          var = Config.GetWord();
          if (var) {
@@ -326,8 +324,6 @@ int XrdCephOss::Configure(const char *configfn, XrdSysError &Eroute) {
            return 1; 
          }
        }       
- 
-     }
 
      // Now check if any errors occured during file i/o
      int retc = Config.LastError();
