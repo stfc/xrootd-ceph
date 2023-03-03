@@ -220,7 +220,6 @@ int XrdCephOss::Configure(const char *configfn, XrdSysError &Eroute) {
            return 1;
          }
        }
-<<<<<<< HEAD
         if (!strncmp(var, "ceph.usebuffer", 14)) { // allowable values: 0, 1
          var = Config.GetWord();
          if (var) {
@@ -317,7 +316,6 @@ int XrdCephOss::Configure(const char *configfn, XrdSysError &Eroute) {
        }
 
      } // while
-=======
 
        if (!strcmp(var, "ceph.reportingpools")) {
          var = Config.GetWord();
@@ -330,7 +328,6 @@ int XrdCephOss::Configure(const char *configfn, XrdSysError &Eroute) {
        }       
  
      }
->>>>>>> 0d3ae23... Disk space reporting (#36)
 
      // Now check if any errors occured during file i/o
      int retc = Config.LastError();
