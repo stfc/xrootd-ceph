@@ -489,17 +489,28 @@ int formatStatLSResponse(char *buff, int &blen, const char* cgroup, long long to
  */
 
 
-int XrdCephOss::StatLS(XrdOucEnv &env, const char *path, char *buff, int &blen)
+int XrdCephOss::StatLS(XrdOucEnv &env, const char *charPath, char *buff, int &blen)
 {
-  XrdCephEroute.Say(__FUNCTION__, " path = ", path);  
+  XrdCephEroute.Say(__FUNCTION__, " incoming path = ", charPath); 
+
+  std::string  path({charPath});
+  auto colonPos = path.find_first_of(':');
+  
+  if (colonPos > 0) {
+    path = path.substr(0, colonPos);
+  }
+    
   std::string spath {path};
   m_translateFileName(spath,path);
 
+//
+// Following test is now redundant as we take the substring up to colonPos
+//
   if (spath.back() == ':') {
     spath.pop_back();
   }
   if (m_configPoolnames.find(spath) == std::string::npos) {
-    XrdCephEroute.Say("Can't report on ", path);
+    XrdCephEroute.Say("Can't report on ", spath.c_str());
     return -EINVAL;
   }
 
@@ -525,7 +536,7 @@ int XrdCephOss::StatLS(XrdOucEnv &env, const char *path, char *buff, int &blen)
 
   freeSpace = totalSpace - usedSpace;
   blen = formatStatLSResponse(buff, blen, 
-    path,       /* "oss.cgroup" */ 
+    charPath,   /* "oss.cgroup" */ 
     totalSpace, /* "oss.space"  */
     usedSpace,  /* "oss.used"   */
     freeSpace,  /* "oss.free"   */
