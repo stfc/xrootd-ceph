@@ -28,6 +28,7 @@
 #include "XrdCeph/XrdCephPosix.hh"
 #include "XrdOuc/XrdOucEnv.hh"
 #include "XrdSys/XrdSysError.hh"
+#include "XrdSys/XrdSysPlatform.hh"
 #include "XrdOuc/XrdOucTrace.hh"
 #include "XrdOuc/XrdOucStream.hh"
 #include "XrdOuc/XrdOucName2Name.hh"
@@ -67,11 +68,6 @@ static void logwrapper(char *format, va_list argp) {
 /// populated in case of ceph.namelib entry in the config file
 /// used in XrdCephPosix
 extern XrdOucName2Name *g_namelib;
-
-//
-// To-do: find the include file defining MAXPATHLEN
-//
-#define MAXPATHLEN 4096
 
 /// converts a logical filename to physical one if needed
 void m_translateFileName(std::string &physName, std::string logName){
