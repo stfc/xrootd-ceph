@@ -366,6 +366,31 @@ int XrdCephOss::Rename(const char *from,
 
 /**
  *
+ * @brief Extract a pool name (string before the first colon ':') from an object ID.
+ * @param (in) possPool the object ID
+ * @return pool name or unchanged object ID
+ *
+ * Implementation:
+ * Ian Johnson		STFC RAL, ian.johnson@stfc.ac.uk, 2022 
+ *
+ */
+
+std::string extractPool(std::string possPool) {
+
+   std::string pool;
+   auto colonPos = possPool.find_first_of(':');
+
+   if (colonPos > 0) {
+     pool = possPool.substr(0, colonPos);
+   } else {
+     pool = possPool;
+   }
+   return pool;
+}
+
+
+/**
+ *
  * Populate a struct stat* with information on an object ID.
  * Determine whether the request relates to a pool name for disk space reporting via
  * StatLS. If not, handle an object path or the notional root element "/"
@@ -394,42 +419,37 @@ int XrdCephOss::Stat(const char* path,
   m_translateFileName(spath,path);
 
   if (spath.back() == '/') { // Request to stat the root 
-#ifdef STAT_TRACE
+    
     XrdCephEroute.Say(__FUNCTION__, " - fake a return for stat'ing root element '/'");
-#endif
+
     // special case of a stat made by the locate interface
     // we intend to then list all files 
     
     memset(buff, 0, sizeof(*buff));
-    buff->st_mode = S_IFDIR | 0700;
+    buff->st_mode = S_IFDIR|S_IRWXU;
+    buff->st_dev = 1;
+    buff->st_ino = 1;
+
     return XrdOssOK;
    
-  } 
-
-  if (spath.find_first_of(":") == spath.length()-1) { // Request to stat just the pool name
+  } else if (ceph_posix_stat(env, path, buff) == 0) { // Found object ID 
 
 #ifdef STAT_TRACE
-    XrdCephEroute.Say(__FUNCTION__, "Found request to stat pool name");
+    XrdCephEroute.Say(__FUNCTION__, " - found object ", spath.c_str(), " via ceph_posix_stat");
 #endif
-
-    spath.pop_back(); // remove colon from pool name
-    if (m_configPoolnames.find(spath) != std::string::npos)  { // Support 'locate' for spaceinfo
-#ifdef STAT_TRACE  
-      XrdCephEroute.Say(__FUNCTION__, " - preparing spaceinfo report for '", path, "'");
-#endif
-      return XrdOssOK; // Only requires a status code, do not need to fill contents in struct stat
-    } else {
-      XrdCephEroute.Say(__FUNCTION__, " - cannot find pool '", path, "' in ceph.reportingpools");
-      return -EINVAL;
-    }
+    return XrdOssOK;
 
   } else {
+
 #ifdef STAT_TRACE
-    XrdCephEroute.Say(__FUNCTION__, " passing to ceph_posix_stat... ");
+    XrdCephEroute.Say(__FUNCTION__, " - cannot find object '", spath.c_str(), "'");
 #endif
-    return ceph_posix_stat(env, path, buff);
-  }  
+    return -ENOENT;
+
+  }
+
 }
+
 
 
 
@@ -494,13 +514,9 @@ int XrdCephOss::StatLS(XrdOucEnv &env, const char *charPath, char *buff, int &bl
   XrdCephEroute.Say(__FUNCTION__, " incoming path = ", charPath); 
 
   std::string  path({charPath});
-  auto colonPos = path.find_first_of(':');
-  
-  if (colonPos > 0) {
-    path = path.substr(0, colonPos);
-  }
-    
+  path = extractPool(path);  
   std::string spath {path};
+ 
   m_translateFileName(spath,path);
 
 //
@@ -536,7 +552,7 @@ int XrdCephOss::StatLS(XrdOucEnv &env, const char *charPath, char *buff, int &bl
 
   freeSpace = totalSpace - usedSpace;
   blen = formatStatLSResponse(buff, blen, 
-    charPath,   /* "oss.cgroup" */ 
+    /* charPath */ spath.c_str(),   /* "oss.cgroup" */ 
     totalSpace, /* "oss.space"  */
     usedSpace,  /* "oss.used"   */
     freeSpace,  /* "oss.free"   */
