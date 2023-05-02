@@ -51,9 +51,39 @@
 #include "XrdSys/XrdSysPlatform.hh"
 #include <XrdOss/XrdOss.hh>
 #include "XrdOuc/XrdOucIOVec.hh"
-
 #include "XrdCeph/XrdCephPosix.hh"
 #include "XrdCeph/XrdCephBulkAioRead.hh"
+#include "XrdSfs/XrdSfsFlags.hh" // for the OFFLINE flag status 
+
+/// small structs to store file metadata
+struct CephFile {
+  std::string name;
+  std::string pool;
+  std::string userId;
+  unsigned int nbStripes;
+  unsigned long long stripeUnit;
+  unsigned long long objectSize;
+};
+
+struct CephFileRef : CephFile {
+  int flags;
+  mode_t mode;
+  uint64_t offset;
+  // This mutex protects against parallel updates of the stats.
+  XrdSysMutex statsMutex;
+  uint64_t maxOffsetWritten;
+  uint64_t bytesAsyncWritePending;
+  uint64_t bytesWritten;
+  unsigned rdcount;
+  unsigned wrcount;
+  unsigned asyncRdStartCount;
+  unsigned asyncRdCompletionCount;
+  unsigned asyncWrStartCount;
+  unsigned asyncWrCompletionCount;
+  ::timeval lastAsyncSubmission;
+  double longestAsyncWriteTime;
+  double longestCallbackInvocation;
+};
 
 /// small struct for directory listing
 struct DirIterator {
@@ -107,6 +137,9 @@ XrdSysMutex g_fd_mutex;
 /// mutex protecting initialization of ceph clusters
 XrdSysMutex g_init_mutex;
 
+//JW Counter for number of times a given cluster is resolved.
+std::map<unsigned int, unsigned long long> g_idxCntr;
+
 /// Accessor to next ceph pool index
 /// Note that this is not thread safe, but we do not care
 /// as we only want a rough load balancing
@@ -130,6 +163,8 @@ unsigned int getCephPoolIdxAndIncrease() {
     nextValue = 0;
   }
   g_cephPoolIdx = nextValue;
+  // JW logging of accesses:
+  ++g_idxCntr[res];
   return res;
 }
 
@@ -228,6 +263,32 @@ static unsigned int stoui(const std::string &s) {
     throw std::out_of_range(s);
   }
   return (unsigned int)res;
+}
+
+
+void dumpClusterInfo() {
+  //JW
+  // log the current state of the cluster:
+  // don't want to lock here, so the numbers may not be 100% self-consistent
+  int n_cluster = g_cluster.size();
+  int n_ioCtx = g_ioCtx.size();
+  int n_filesOpenForWrite = g_filesOpenForWrite.size();
+  int n_fds = g_fds.size(); 
+  int n_stripers = g_radosStripers.size(); 
+  int n_stripers_pool = 0;
+  for (size_t i = 0; i < g_radosStripers.size(); ++i) {
+    n_stripers_pool += g_radosStripers.at(i).size();
+  }
+  std::stringstream ss;
+  ss << "Counts: " << n_cluster << " " << n_ioCtx << " " << n_filesOpenForWrite << " " 
+     << n_fds << " " << n_stripers << " " << n_stripers_pool << " " << n_stripers_pool 
+     << " CountsbyCluster: [";
+  for (const auto& el : g_idxCntr) {
+    ss << el.first << ":" << el.second << ", " ;
+  } // it
+  ss<< "], ";
+
+    logwrapper((char*)"dumpClusterInfo : %s", ss.str().c_str());
 }
 
 
@@ -636,12 +697,12 @@ int ceph_posix_open(XrdOucEnv* env, const char *pathname, int flags, mode_t mode
 
   struct stat buf;
   libradosstriper::RadosStriper *striper = getRadosStriper(fr); //Get a handle to the RADOS striper API
- 
   if (NULL == striper) {
     logwrapper((char*)"Cannot create striper");  
     return -EINVAL;
   }
- 
+  dumpClusterInfo(); // JW enhanced logging
+
   int rc = striper->stat(fr.name, (uint64_t*)&(buf.st_size), &(buf.st_atime)); //Get details about a file
   
  
@@ -1447,6 +1508,9 @@ int ceph_posix_truncate(XrdOucEnv* env, const char *pathname, unsigned long long
 
 int ceph_posix_unlink(XrdOucEnv* env, const char *pathname) {
   logwrapper((char*)"ceph_posix_unlink : %s", pathname);
+  // start the timer
+  auto timer_start = std::chrono::steady_clock::now();
+
   // minimal stat : only size and times are filled
   CephFile file = getCephFile(pathname, env);
   libradosstriper::RadosStriper *striper = getRadosStriper(file);
@@ -1454,7 +1518,15 @@ int ceph_posix_unlink(XrdOucEnv* env, const char *pathname) {
     return -EINVAL;
   }
   int rc = striper->remove(file.name);
+  auto end = std::chrono::steady_clock::now();
+  auto deltime_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - timer_start).count();
+
+  if (rc == 0) {
+      logwrapper((char*)"ceph_posix_unlink : %s unlink successful: %d ms", pathname, deltime_ms);
+      return 0;
+  }
   if (rc != -EBUSY) {
+    logwrapper((char*)"ceph_posix_unlink : %s unlink failed: %d ms; return code %d", pathname, deltime_ms, rc);
     return rc; 
   }
   // if EBUSY returned, assume the file is locked; so try to remove the lock
@@ -1469,10 +1541,13 @@ int ceph_posix_unlink(XrdOucEnv* env, const char *pathname) {
 
   // now try to remove again
   rc = striper->remove(file.name);
+  end = std::chrono::steady_clock::now();
+  deltime_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end - timer_start).count();
+
   if (rc != 0) {
-    logwrapper((char*)"ceph_posix_unlink : unlink failed after lock removal %s, %d", pathname, rc);
+    logwrapper((char*)"ceph_posix_unlink : unlink failed after lock removal %s, %d ms", pathname, deltime_ms);
   } else {
-    logwrapper((char*)"ceph_posix_unlink : unlink suceeded after lock removal %s, %d", pathname, rc);
+    logwrapper((char*)"ceph_posix_unlink : unlink suceeded after lock removal %s, %d ms", pathname, deltime_ms);
   }
   return rc; 
 }

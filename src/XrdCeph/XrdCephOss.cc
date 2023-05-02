@@ -29,6 +29,7 @@
 #include "XrdCeph/XrdCephPosix.hh"
 #include "XrdOuc/XrdOucEnv.hh"
 #include "XrdSys/XrdSysError.hh"
+#include "XrdSys/XrdSysPlatform.hh"
 #include "XrdOuc/XrdOucTrace.hh"
 #include "XrdOuc/XrdOucStream.hh"
 #include "XrdOuc/XrdOucName2Name.hh"
@@ -41,6 +42,8 @@
 #include "XrdCeph/XrdCephOss.hh"
 #include "XrdCeph/XrdCephOssDir.hh"
 #include "XrdCeph/XrdCephOssFile.hh"
+#include "XrdCeph/XrdCephOssBufferedFile.hh"
+#include "XrdCeph/XrdCephOssReadVFile.hh"
 
 XrdVERSIONINFO(XrdOssGetStorageSystem, XrdCephOss);
 
@@ -222,16 +225,6 @@ int XrdCephOss::Configure(const char *configfn, XrdSysError &Eroute) {
          }
        }
 
-       if (!strcmp(var, "ceph.reportingpools")) {
-         var = Config.GetWord();
-         if (var) {
-           m_configPoolnames = var;
-         } else {
-           Eroute.Emsg("Config", "Missing value for ceph.reportingpools in config file", configfn);
-           return 1; 
-         }
-       }       
-
        int pread_flag_set = !strncmp(var, "ceph.usedefaultpreadalg", 24);
        int readv_flag_set = !strncmp(var, "ceph.usedefaultreadvalg", 24);
        if (pread_flag_set or readv_flag_set) {
@@ -271,8 +264,112 @@ int XrdCephOss::Configure(const char *configfn, XrdSysError &Eroute) {
            return 1; 
          }
        }
-     }
+     
+        if (!strncmp(var, "ceph.usebuffer", 14)) { // allowable values: 0, 1
+         var = Config.GetWord();
+         if (var) {
+           unsigned long value = strtoul(var, 0, 10);
+           if (value <= 1) {
+             m_configBufferEnable = value;
+             Eroute.Emsg("Config", "ceph.usebuffer",std::to_string(m_configBufferEnable).c_str());
+           } else {
+             Eroute.Emsg("Config", "Invalid value for ceph.usebuffer in config file (must be 0 or 1)", configfn, var);
+             return 1;
+           }
+         } else {
+           Eroute.Emsg("Config", "Missing value for ceph.usebuffer in config file", configfn);
+           return 1;
+         }
+       } // usebuffer
+        if (!strncmp(var, "ceph.buffersize", 15)) { // size in bytes
+         var = Config.GetWord();
+         if (var) {
+           unsigned long value = strtoul(var, 0, 10);
+           if (value > 0 and value <= 1000000000L) {
+             m_configBufferSize = value;
+            Eroute.Emsg("Config", "ceph.buffersize", std::to_string(m_configBufferSize).c_str() ); 
+           } else {
+             Eroute.Emsg("Config", "Invalid value for ceph.buffersize in config file; enter in bytes (no units)", configfn, var);
+             return 1;
+           }
+         } else {
+           Eroute.Emsg("Config", "Missing value for ceph.buffersize in config file", configfn);
+           return 1;
+         }
+       } // buffersize
+        if (!strncmp(var, "ceph.buffermaxpersimul", 22)) { // size in bytes
+         var = Config.GetWord();
+         if (var) {
+           unsigned long value = strtoul(var, 0, 10);
+           if (value > 0 and value <= 1000000000L) {
+             m_configMaxSimulBufferCount = value;
+            Eroute.Emsg("Config", "ceph.buffermaxpersimul", std::to_string(m_configMaxSimulBufferCount).c_str() ); 
+           } else {
+             Eroute.Emsg("Config", "Invalid value for ceph.buffermaxpersimul in config file; enter in bytes (no units)", configfn, var);
+             return 1;
+           }
+         } else {
+           Eroute.Emsg("Config", "Missing value for ceph.buffermaxpersimul in config file", configfn);
+           return 1;
+         }
+       } // buffersize
 
+          if (!strncmp(var, "ceph.usereadv", 13)) { // allowable values: 0, 1
+         var = Config.GetWord();
+         if (var) {
+           unsigned long value = strtoul(var, 0, 10);
+           if (value <= 1) {
+             m_configReadVEnable = value;
+             Eroute.Emsg("Config", "ceph.usereadvalg",std::to_string(m_configBufferEnable).c_str());
+           } else {
+             Eroute.Emsg("Config", "Invalid value for ceph.usereadv in config file (must be 0 or 1)", configfn, var);
+             return 1;
+           }
+         } else {
+           Eroute.Emsg("Config", "Missing value for ceph.usereadv in config file", configfn);
+           return 1;
+         }
+       } // usereadv
+       if (!strncmp(var, "ceph.readvalgname", 17)) {
+         var = Config.GetWord();
+        // Eroute.Emsg("Config", "readvalgname readvalgname readvalgname readvalgname", var);
+         if (var) {
+           // Warn in case parameters were givne
+           char parms[1040];
+           if (!Config.GetRest(parms, sizeof(parms)) || parms[0]) {
+             Eroute.Emsg("Config", "readvalgname parameters will be ignored");
+           }
+          m_configReadVAlgName = var;
+         } else {
+           Eroute.Emsg("Config", "Missing value for ceph.readvalgname in config file", configfn);
+           return 1;
+         }
+       }
+       if (!strncmp(var, "ceph.bufferiomode", 17)) {
+         var = Config.GetWord();
+         if (var) {
+           // Warn in case parameters were givne
+           char parms[1040];
+           if (!Config.GetRest(parms, sizeof(parms)) || parms[0]) {
+             Eroute.Emsg("Config", "readvalgname parameters will be ignored");
+           }
+          m_configBufferIOmode = var; // allowed values would be aio, io
+         } else {
+           Eroute.Emsg("Config", "Missing value for ceph.bufferiomode in config file", configfn);
+           return 1;
+         }
+       }
+
+       if (!strcmp(var, "ceph.reportingpools")) {
+         var = Config.GetWord();
+         if (var) {
+           m_configPoolnames = var;
+         } else {
+           Eroute.Emsg("Config", "Missing value for ceph.reportingpools in config file", configfn);
+           return 1; 
+         }
+       }       
+     }
      // Now check if any errors occured during file i/o
      int retc = Config.LastError();
      if (retc) {
@@ -314,6 +411,32 @@ int XrdCephOss::Rename(const char *from,
 
 /**
  *
+
+ * @brief Extract a pool name (string before the first colon ':') from an object ID.
+ * @param (in) possPool the object ID
+ * @return pool name or unchanged object ID
+ *
+ * Implementation:
+ * Ian Johnson		STFC RAL, ian.johnson@stfc.ac.uk, 2022 
+ *
+ */
+
+std::string extractPool(std::string possPool) {
+
+   std::string pool;
+   auto colonPos = possPool.find_first_of(':');
+
+   if (colonPos > 0) {
+     pool = possPool.substr(0, colonPos);
+   } else {
+     pool = possPool;
+   }
+   return pool;
+}
+
+
+/**
+ *
  * Populate a struct stat* with information on an object ID.
  * Determine whether the request relates to a pool name for disk space reporting via
  * StatLS. If not, handle an object path or the notional root element "/"
@@ -342,18 +465,22 @@ int XrdCephOss::Stat(const char* path,
   m_translateFileName(spath,path);
 
   if (spath.back() == '/') { // Request to stat the root 
+
 #ifdef STAT_TRACE
     XrdCephEroute.Say(__FUNCTION__, " - fake a return for stat'ing root element '/'");
 #endif
+
     // special case of a stat made by the locate interface
     // we intend to then list all files 
     
     memset(buff, 0, sizeof(*buff));
-    buff->st_mode = S_IFDIR | 0700;
+    buff->st_mode = S_IFDIR|S_IRWXU;
+    buff->st_dev = 1;
+    buff->st_ino = 1;
+
     return XrdOssOK;
    
   } 
-
   if (spath.find_first_of(":") == spath.length()-1) { // Request to stat just the pool name
 
 #ifdef STAT_TRACE
@@ -371,12 +498,22 @@ int XrdCephOss::Stat(const char* path,
       return -EINVAL;
     }
 
-  } else {
+  } else if (ceph_posix_stat(env, path, buff) == 0) { // Found object ID 
+
 #ifdef STAT_TRACE
-    XrdCephEroute.Say(__FUNCTION__, " passing to ceph_posix_stat... ");
+    XrdCephEroute.Say(__FUNCTION__, " - found object ", spath.c_str(), " via ceph_posix_stat");
 #endif
-    return ceph_posix_stat(env, path, buff);
-  }  
+    return XrdOssOK;
+
+  } else {
+
+#ifdef STAT_TRACE
+    XrdCephEroute.Say(__FUNCTION__, " - cannot find object '", spath.c_str(), "'");
+#endif
+    return -ENOENT;
+
+  }
+
 }
 
 
@@ -437,17 +574,25 @@ int formatStatLSResponse(char *buff, int &blen, const char* cgroup, long long to
  */
 
 
-int XrdCephOss::StatLS(XrdOucEnv &env, const char *path, char *buff, int &blen)
+
+int XrdCephOss::StatLS(XrdOucEnv &env, const char *charPath, char *buff, int &blen)
 {
-  XrdCephEroute.Say(__FUNCTION__, " path = ", path);  
+  XrdCephEroute.Say(__FUNCTION__, " incoming path = ", charPath); 
+
+  std::string  path({charPath});
+  path = extractPool(path);  
   std::string spath {path};
+ 
   m_translateFileName(spath,path);
 
+//
+// Following test is now redundant as we take the substring up to colonPos
+//
   if (spath.back() == ':') {
     spath.pop_back();
   }
   if (m_configPoolnames.find(spath) == std::string::npos) {
-    XrdCephEroute.Say("Can't report on ", path);
+    XrdCephEroute.Say("Can't report on ", spath.c_str());
     return -EINVAL;
   }
 
@@ -511,6 +656,22 @@ XrdOssDF* XrdCephOss::newDir(const char *tident) {
 }
 
 XrdOssDF* XrdCephOss::newFile(const char *tident) {
-  return new XrdCephOssFile(this);
+
+  // Depending on the configuration settings stack up the underlying 
+  // XrdCephOssFile instance with decorator objects for readV and Buffering requests
+
+  XrdCephOssFile* xrdCephOssDF =  new XrdCephOssFile(this);
+  
+  if (m_configReadVEnable) {
+    xrdCephOssDF = new XrdCephOssReadVFile(this,xrdCephOssDF,m_configReadVAlgName);
+  }
+
+  if (m_configBufferEnable) {
+    xrdCephOssDF = new XrdCephOssBufferedFile(this,xrdCephOssDF, m_configBufferSize, 
+                                              m_configBufferIOmode, m_configMaxSimulBufferCount);
+  }
+
+
+  return xrdCephOssDF;
 }
 
