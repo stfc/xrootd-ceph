@@ -70,10 +70,6 @@ static void logwrapper(char *format, va_list argp) {
 /// used in XrdCephPosix
 extern XrdOucName2Name *g_namelib;
 
-//
-// To-do: find the include file defining MAXPATHLEN
-//
-#define MAXPATHLEN 4096
 
 /// converts a logical filename to physical one if needed
 void m_translateFileName(std::string &physName, std::string logName){
