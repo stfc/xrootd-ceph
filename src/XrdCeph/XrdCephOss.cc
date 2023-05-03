@@ -618,7 +618,7 @@ int XrdCephOss::StatLS(XrdOucEnv &env, const char *charPath, char *buff, int &bl
 
   freeSpace = totalSpace - usedSpace;
   blen = formatStatLSResponse(buff, blen, 
-    path,       /* "oss.cgroup" */ 
+    spath.c_str(),       /* "oss.cgroup" */ 
     totalSpace, /* "oss.space"  */
     usedSpace,  /* "oss.used"   */
     freeSpace,  /* "oss.free"   */
