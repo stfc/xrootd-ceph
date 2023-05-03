@@ -55,35 +55,6 @@
 #include "XrdCeph/XrdCephBulkAioRead.hh"
 #include "XrdSfs/XrdSfsFlags.hh" // for the OFFLINE flag status 
 
-/// small structs to store file metadata
-struct CephFile {
-  std::string name;
-  std::string pool;
-  std::string userId;
-  unsigned int nbStripes;
-  unsigned long long stripeUnit;
-  unsigned long long objectSize;
-};
-
-struct CephFileRef : CephFile {
-  int flags;
-  mode_t mode;
-  uint64_t offset;
-  // This mutex protects against parallel updates of the stats.
-  XrdSysMutex statsMutex;
-  uint64_t maxOffsetWritten;
-  uint64_t bytesAsyncWritePending;
-  uint64_t bytesWritten;
-  unsigned rdcount;
-  unsigned wrcount;
-  unsigned asyncRdStartCount;
-  unsigned asyncRdCompletionCount;
-  unsigned asyncWrStartCount;
-  unsigned asyncWrCompletionCount;
-  ::timeval lastAsyncSubmission;
-  double longestAsyncWriteTime;
-  double longestCallbackInvocation;
-};
 
 /// small struct for directory listing
 struct DirIterator {
