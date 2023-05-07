@@ -68,22 +68,7 @@ ssize_t CephIOAdapterRaw::read(off64_t offset, size_t count) {
 
     // no check is made whether the buffer has sufficient capacity
     auto start = std::chrono::steady_clock::now();
-    if (!m_useStriperlessReads) {
-      rc = ceph_posix_pread(m_fd,buf,count,offset);
-    } else {
-      rc = ceph_posix_nonstriper_pread(m_fd, buf, count,offset);
-      if (-ENOENT == rc || -ENOTSUP == rc) {
-        //This might be a sparse file or nbstripes > 1, so let's try striper read
-        rc = ceph_posix_pread(m_fd, buf, count,offset);
-        if (rc >= 0) {
-          char err_str[100]; //99 symbols should be enough for the short message
-          snprintf(err_str, 100, "WARNING! The file (fd %d) seem to be sparse, this is not expected", m_fd);
-          BUFLOG(err_str);
-        }
-      }
-    }
-
-    
+    rc = ceph_posix_maybestriper_pread(m_fd,buf,count,offset, m_useStriperlessReads);
     auto end = std::chrono::steady_clock::now();
     //auto elapsed = end-start;
     auto int_ms = std::chrono::duration_cast<std::chrono::milliseconds>(end-start);
