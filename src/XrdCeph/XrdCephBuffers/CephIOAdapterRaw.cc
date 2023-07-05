@@ -51,8 +51,8 @@ ssize_t CephIOAdapterRaw::write(off64_t offset,size_t count) {
     //           <<  offset << " " << count << " " << rc << " " << int_ms.count() );
 
     if (rc < 0) return rc;
-    m_stats_write_longest = std::max(m_stats_write_longest,int_ns.count()); 
-    m_stats_write_timer.fetch_add(int_ns.count());
+    m_stats_write_longest = std::max(m_stats_write_longest,static_cast<long long>(int_ns.count())); 
+    m_stats_write_timer.fetch_add(static_cast<long long>(int_ns.count()));
     m_stats_write_bytes.fetch_add(rc);
     ++m_stats_write_req;
     return rc;
@@ -78,8 +78,8 @@ ssize_t CephIOAdapterRaw::read(off64_t offset, size_t count) {
       return rc;
     }
 
-    m_stats_read_longest = std::max(m_stats_read_longest,int_ns.count()); 
-    m_stats_read_timer.fetch_add(int_ns.count());
+    m_stats_read_longest = std::max(m_stats_read_longest,static_cast<long long>(int_ns.count())); 
+    m_stats_read_timer.fetch_add(static_cast<long long>(int_ns.count()));
     m_stats_read_bytes.fetch_add(rc);
     ++m_stats_read_req;
 
