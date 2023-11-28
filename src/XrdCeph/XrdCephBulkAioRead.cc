@@ -13,6 +13,27 @@ bulkAioRead::bulkAioRead(librados::IoCtx* ct, logfunc_pointer logwrapper, CephFi
   context = ct;
   file_ref = fileref;
   log_func = logwrapper;
+  librados::bufferlist d_stripeUnit ;
+  librados::bufferlist d_objectSize ;
+  b_stripeUnit = file_ref->stripeUnit;
+  b_objectSize = file_ref->objectSize;
+  std::string obj_name;
+  try {
+    obj_name =  file_ref->name + std::string(".0000000000000000");
+  } catch (std::bad_alloc&) {
+    log_func((char*)"Can not create object string for file %s)", file_ref->name.c_str());
+  }
+  int ret = 0;
+  ret = context->getxattr(obj_name, "striper.layout.stripe_unit", d_stripeUnit);
+  ret = context->getxattr(obj_name, "striper.size", d_objectSize);
+  log_func((char*)"size xattr for %s , %llu ,%llu", file_ref->name.c_str(), file_ref->objectSize, file_ref->stripeUnit );
+  if (ret<0){
+    log_func((char*)"Could not find size xattr for %s", file_ref->name.c_str());
+    }
+  else{
+    file_ref->stripeUnit = std::stoull(d_stripeUnit.c_str());
+    file_ref->objectSize = std::stoull(d_objectSize.c_str());
+  }
 }
 
 bulkAioRead::~bulkAioRead() {
