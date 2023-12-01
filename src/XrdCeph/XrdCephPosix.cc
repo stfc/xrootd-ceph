@@ -699,7 +699,7 @@ int ceph_posix_open(XrdOucEnv* env, const char *pathname, int flags, mode_t mode
         logwrapper((char*)"Can not create object string for file %s)", fr.name.c_str());
       }
       int ret = 0;
-      ret = context->getxattr(obj_name, "striper.layout.stripe_unit", d_stripeUnit));
+      ret = context->getxattr(obj_name, "striper.layout.stripe_unit", d_stripeUnit);
       ret = std::min(ret,context->getxattr(obj_name, "striper.layout.object_size", d_objectSize));
       //log_func((char*)"size xattr for %s , %llu ,%llu", file_ref->name.c_str(), file_ref->objectSize, file_ref->stripeUnit );
      if (ret<0){
