@@ -684,8 +684,8 @@ int ceph_posix_open(XrdOucEnv* env, const char *pathname, int flags, mode_t mode
   if ((flags&O_ACCMODE) == O_RDONLY) {  // Access mode is READ
 
     if (fileExists) {
-      librados::bufferlist d_stripeUnit ;
-      librados::bufferlist d_objectSize ;
+      librados::bufferlist d_stripeUnit;
+      librados::bufferlist d_objectSize;
       std::string obj_name;
       librados::IoCtx *context = getIoCtx(fr);
       // read first stripe of the object for xattr stripe unit and object size
@@ -703,7 +703,7 @@ int ceph_posix_open(XrdOucEnv* env, const char *pathname, int flags, mode_t mode
       ret = std::min(ret,context->getxattr(obj_name, "striper.layout.object_size", d_objectSize));
       //log_func((char*)"size xattr for %s , %llu ,%llu", file_ref->name.c_str(), file_ref->objectSize, file_ref->stripeUnit );
      if (ret<0){
-       logwrapper((char*)"Could not find size xattr for %s", fr.name.c_str());
+       logwrapper((char*)"Could not find size or stripe_unit xattr for %s", fr.name.c_str());
       }
      else{
        fr.stripeUnit = std::stoull(d_stripeUnit.c_str());
