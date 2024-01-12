@@ -713,7 +713,8 @@ int ceph_posix_open(XrdOucEnv* env, const char *pathname, int flags, mode_t mode
        unsigned int objectSizeLength = std::min((unsigned int)1023, d_objectSize.length());
        strncpy( cleanStripeUnit, d_stripeUnit.c_str(), stripeUnitLength );
        strncpy( cleanObjectSize, d_objectSize.c_str(), objectSizeLength );
-
+       cleanStripeUnit[stripeUnitLength] = '\0';
+       cleanObjectSize[objectSizeLength] = '\0';
        fr.stripeUnit = std::stoull(cleanStripeUnit);
        fr.objectSize = std::stoull(cleanObjectSize);
      } 
