@@ -707,8 +707,8 @@ int ceph_posix_open(XrdOucEnv* env, const char *pathname, int flags, mode_t mode
        logwrapper((char*)"Could not find size or stripe_unit xattr for %s", fr.name.c_str());
       }
      else{
-       char *cleanStripeUnit = new char[1024];
-       char *cleanObjectSize = new char[1024];
+       char[1024] cleanStripeUnit;
+       char[1024] cleanObjectSize;
        unsigned int stripeUnitLength = std::min((unsigned int)1023, d_stripeUnit.length());
        unsigned int objectSizeLength = std::min((unsigned int)1023, d_objectSize.length());
        strncpy( cleanStripeUnit, d_stripeUnit.c_str(), stripeUnitLength );
