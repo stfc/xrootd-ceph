@@ -717,10 +717,10 @@ int ceph_posix_open(XrdOucEnv* env, const char *pathname, int flags, mode_t mode
        cleanStripeUnit[stripeUnitLength] = '\0';
        cleanObjectSize[objectSizeLength] = '\0';
        if(fr.stripeUnit != std::stoull(cleanStripeUnit)){
-         logwrapper((char*)"WARNING: stripe unit does not match defaults. object size is %s",cleanStripeUnit);
+         logwrapper((char*)"WARNING: stripe unit of %s does not match defaults. object size is %s", pathname, cleanStripeUnit);
        }
        if(fr.objectSize != std::stoull(cleanObjectSize)){
-         logwrapper((char*)"WARNING: object size does not match defaults. object size is %s",cleanObjectSize);
+         logwrapper((char*)"WARNING: object size of %s does not match defaults. object size is %s",pathname, cleanObjectSize);
        }
        fr.stripeUnit = std::stoull(cleanStripeUnit);
        fr.objectSize = std::stoull(cleanObjectSize);
