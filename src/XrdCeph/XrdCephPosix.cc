@@ -707,6 +707,7 @@ int ceph_posix_open(XrdOucEnv* env, const char *pathname, int flags, mode_t mode
        logwrapper((char*)"Could not find size or stripe_unit xattr for %s", fr.name.c_str());
       }
      else{
+       //librados's c_str() method does not return a NULL-terminated string, hence why we need to cleanup here
        char cleanStripeUnit[1024];
        char cleanObjectSize[1024];
        unsigned int stripeUnitLength = std::min((unsigned int)1023, d_stripeUnit.length());
@@ -715,6 +716,12 @@ int ceph_posix_open(XrdOucEnv* env, const char *pathname, int flags, mode_t mode
        strncpy( cleanObjectSize, d_objectSize.c_str(), objectSizeLength );
        cleanStripeUnit[stripeUnitLength] = '\0';
        cleanObjectSize[objectSizeLength] = '\0';
+       if(fr.stripeUnit != std::stoull(cleanStripeUnit)){
+         logwrapper((char*)"WARNING: stripe unit does not match defaults. object size is %s",cleanStripeUnit);
+       }
+       if(fr.objectSize != std::stoull(cleanObjectSize)){
+         logwrapper((char*)"WARNING: object size does not match defaults. object size is %s",cleanObjectSize);
+       }
        fr.stripeUnit = std::stoull(cleanStripeUnit);
        fr.objectSize = std::stoull(cleanObjectSize);
      } 
