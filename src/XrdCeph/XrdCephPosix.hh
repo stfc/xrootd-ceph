@@ -41,6 +41,7 @@
 
 // simple logging for XrdCeph buffering code
 #define XRDCEPHLOGLEVEL 1
+#define MAXDIGITSIZE 32
 #ifdef XRDCEPHLOGLEVEL 
   // ensure that 
   //   extern XrdOucTrace XrdCephTrace; 
