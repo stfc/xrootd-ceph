@@ -33,6 +33,7 @@
 #include <stdarg.h>
 #include <string>
 #include <dirent.h>
+#include <cstdint>
 #include <XrdOuc/XrdOucEnv.hh>
 #include <XrdSys/XrdSysXAttr.hh>
 
