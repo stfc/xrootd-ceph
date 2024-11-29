@@ -33,11 +33,26 @@
 #include <stdarg.h>
 #include <string>
 #include <dirent.h>
+#include <cstdint>
 #include <XrdOuc/XrdOucEnv.hh>
 #include <XrdSys/XrdSysXAttr.hh>
 
 #include "XrdSys/XrdSysPthread.hh"
 #include "XrdOuc/XrdOucIOVec.hh"
+
+// simple logging for XrdCeph buffering code
+#define XRDCEPHLOGLEVEL 1
+#define MAXDIGITSIZE 32
+#ifdef XRDCEPHLOGLEVEL 
+  // ensure that 
+  //   extern XrdOucTrace XrdCephTrace; 
+  // is in the cc file where you want to log // << std::endl
+  //#define LOGCEPH(x) {std::stringstream _s; _s << x;   XrdCephTrace.Beg(); std::clog << _s.str() ; XrdCephTrace.End(); _s.clear();}
+  #define LOGCEPH(x) {std::stringstream _s; _s << x;  std::clog << _s.str() << std::endl; _s.clear(); }
+#else 
+  #define LOGCEPH(x) 
+#endif 
+
 
 class XrdSfsAio;
 typedef void(AioCB)(XrdSfsAio*, size_t);
@@ -57,6 +72,8 @@ ssize_t ceph_striper_readv(int fd, XrdOucIOVec *readV, int n);
 ssize_t ceph_posix_read(int fd, void *buf, size_t count);
 ssize_t ceph_posix_nonstriper_pread(int fd, void *buf, size_t count, off64_t offset);
 ssize_t ceph_posix_pread(int fd, void *buf, size_t count, off64_t offset);
+ssize_t ceph_posix_maybestriper_pread(int fd, void *buf, size_t count, off64_t offset, bool allowStriper=true);
+
 ssize_t ceph_aio_read(int fd, XrdSfsAio *aiop, AioCB *cb);
 int ceph_posix_fstat(int fd, struct stat *buf);
 int ceph_posix_stat(XrdOucEnv* env, const char *pathname, struct stat *buf);
